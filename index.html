@@ -1,0 +1,1441 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Parapet · Functional Scala 3 toolkit for distributed systems</title>
+    <meta
+      name="description"
+      content="Parapet is a purely functional Scala 3 toolkit for building distributed systems with isolated processes, a typed DSL, predictable scheduling, and pluggable runtimes."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#overview" aria-label="Parapet home">
+        <span class="brand-mark">parapet</span>
+        <span class="brand-subtitle">systems as values · Scala 3</span>
+      </a>
+
+      <nav class="nav" aria-label="Documentation">
+        <details class="nav-group" open>
+          <summary>Paths</summary>
+          <a href="#path-ai">Coding with AI agents</a>
+          <a href="#path-fp">From Scala FP</a>
+          <a href="#path-platform">From Flink / Akka</a>
+        </details>
+
+        <details class="nav-group">
+          <summary>Introduction</summary>
+          <a href="#overview">Overview</a>
+          <a href="#why">Why Parapet</a>
+          <a href="#install">Install</a>
+          <a href="#first-process">First process</a>
+          <a href="#run-app">Run an app</a>
+        </details>
+
+        <details class="nav-group">
+          <summary>Learn</summary>
+          <a href="#learn-fa">F[_] algebra</a>
+          <a href="#learn-effect">Effect &amp; effect systems</a>
+          <a href="#learn-dsl">Composable DSL</a>
+          <a href="#learn-free">The free encoding</a>
+          <a href="#learn-extend-op">Add a custom FlowOp</a>
+          <a href="#learn-extend-interp">Extend the interpreter</a>
+        </details>
+
+        <details class="nav-group">
+          <summary>Core concepts</summary>
+          <a href="#process-model">Process model</a>
+          <a href="#lifecycle">Process lifecycle</a>
+          <a href="#system-events">System events</a>
+          <a href="#switch">Switching behavior</a>
+          <a href="#combinators">Process combinators</a>
+          <a href="#channels">Channel</a>
+          <a href="#errors">Errors are events</a>
+          <a href="#deadletter">Dead-letter</a>
+          <a href="#configuration">Configuration</a>
+        </details>
+
+        <details class="nav-group">
+          <summary>DSL reference</summary>
+          <a href="#dsl-cheat">Cheatsheet</a>
+          <a href="#dsl-unit">unit · pure · flow</a>
+          <a href="#dsl-send">send · ~&gt;</a>
+          <a href="#dsl-forward">forward</a>
+          <a href="#dsl-reply">reply · withSender</a>
+          <a href="#dsl-eval">eval · suspend</a>
+          <a href="#dsl-delay">delay</a>
+          <a href="#dsl-fork">fork · par</a>
+          <a href="#dsl-race">race</a>
+          <a href="#dsl-offload">offload</a>
+          <a href="#dsl-register">register · halt</a>
+          <a href="#dsl-error">handleError · guarantee</a>
+        </details>
+
+        <details class="nav-group">
+          <summary>Network</summary>
+          <a href="#net-overview">Transport traits</a>
+          <a href="#net-tcp-server">TCP server process</a>
+          <a href="#net-tcp-client">TCP client process</a>
+          <a href="#net-tcp-app">Two processes over TCP</a>
+        </details>
+
+        <details class="nav-group">
+          <summary>Modules</summary>
+          <a href="#modules">Module map</a>
+          <a href="#runtime-choice">Runtime choice</a>
+          <a href="#testing">Testing</a>
+        </details>
+
+        <details class="nav-group">
+          <summary>Project</summary>
+          <a href="#roadmap">Roadmap</a>
+          <a href="#status">Status</a>
+          <a href="#links">Links</a>
+        </details>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <!-- ============================================================
+           INTRODUCTION
+           ============================================================ -->
+      <section class="section hero" id="overview">
+        <p class="eyebrow">Scala 3 · functional runtime primitives · distributed systems</p>
+        <h1>Build distributed programs as ordinary, composable values.</h1>
+        <p class="hero-copy">
+          A small DSL surface and inspectable programs — the substrate that AI agents and humans
+          can both reason about. Isolated processes, typed mailboxes, predictable scheduling,
+          pluggable transports, and swappable distributed-systems algorithms. Describe the system
+          first, then interpret it with the runtime backend you choose.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="#install">Get started</a>
+          <a class="button" href="https://github.com/parapet-io/parapet">GitHub</a>
+          <a class="button" href="#roadmap">Roadmap</a>
+        </div>
+        <div class="onramp-grid" aria-label="Where to start">
+          <a class="onramp" href="#path-ai">
+            <span class="onramp-tag">For AI-assisted teams</span>
+            <strong>Coding with AI agents</strong>
+            <span class="onramp-copy">Why LLMs write better distributed code on top of a small, named DSL — and what we ship to help them do it.</span>
+          </a>
+          <a class="onramp" href="#path-fp">
+            <span class="onramp-tag">For Scala FP engineers</span>
+            <strong>From Akka Typed &amp; cats-effect</strong>
+            <span class="onramp-copy">Effect-polymorphic, free-monad-encoded, runtime-agnostic. Typed mailboxes are on the roadmap.</span>
+          </a>
+          <a class="onramp" href="#path-platform">
+            <span class="onramp-tag">For data &amp; infra teams</span>
+            <strong>From Flink / Kafka Connect</strong>
+            <span class="onramp-copy">Same shape — processes, supervision, transports — but algorithms are connectors you can swap.</span>
+          </a>
+        </div>
+        <div class="signal-grid" aria-label="Parapet highlights">
+          <article>
+            <strong>Programs are values</strong>
+            <span>Handlers produce <code>DslF[F, Unit]</code>: composable, testable, replayable.</span>
+          </article>
+          <article>
+            <strong>Pure actor semantics</strong>
+            <span>One process, one mailbox, sequential handling, no shared mutable state.</span>
+          </article>
+          <article>
+            <strong>Runtime agnostic</strong>
+            <span>Use Cats Effect today, study <code>ParIO</code>, or supply your own backend.</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="why">
+        <div class="section-heading">
+          <p class="eyebrow">Introduction</p>
+          <h2>Why Parapet</h2>
+        </div>
+        <p>
+          Actor toolkits make distributed work easy to <em>start</em>, but the resulting programs
+          are operational artifacts: they run, but they cannot be passed around, inspected, or
+          composed like ordinary values. Parapet keeps the actor model and adds the missing piece —
+          handlers return <em>data</em> describing what should happen, not callbacks performing it.
+        </p>
+        <p>
+          That single decision unlocks the rest: you can lift a handler into a test harness,
+          interpret it under any effect type, intercept and trace every event, run the same program
+          on different runtimes, or evolve from a single JVM to a network without rewriting your
+          domain code.
+        </p>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Process isolation</h3>
+            <p>Each process owns a mailbox, processes one message at a time, and never shares mutable state.</p>
+          </article>
+          <article class="card">
+            <h3>Effect polymorphism</h3>
+            <p>Programs are generic in <code>F[_]</code>. Pick Cats Effect for production, <code>ParIO</code> for learning.</p>
+          </article>
+          <article class="card">
+            <h3>Composable DSL</h3>
+            <p>Send, fork, race, suspend, offload — all return values that can be sequenced and combined.</p>
+          </article>
+          <article class="card">
+            <h3>First-class failure</h3>
+            <p>Errors are <code>Failure</code> events. Supervision and recovery use the same model as normal handling.</p>
+          </article>
+        </div>
+
+        <div class="whynow">
+          <p class="eyebrow">Why now · 2026</p>
+          <h3>AI writes code. Concurrent code is the part it gets wrong.</h3>
+          <p>
+            Modern LLMs are confident, fluent, and frequently wrong about ordering, races, and
+            partial failure — the exact properties that distributed systems are made of. The
+            response is not to write more imperative scaffolding for the agent to copy; it is to
+            give the agent a substrate whose legal moves are <em>few, named, and inspectable</em>,
+            so the things it generates are things you can review, replay, and prove.
+          </p>
+          <p>
+            Parapet is built around that constraint. The DSL has roughly a dozen operators. A
+            handler returns a value, not a side effect. Two engineers — or one engineer and one
+            agent — can read the same program and agree on what it does.
+            <a href="#path-ai">See how AI-assisted teams use this →</a>
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           AUDIENCE PATHS — three on-ramps into the rest of the docs
+           ============================================================ -->
+      <section class="section" id="path-ai">
+        <div class="section-heading">
+          <p class="eyebrow">Paths · For AI-assisted teams</p>
+          <h2>Coding with AI agents</h2>
+        </div>
+        <p>
+          The bet is simple: an agent that can only invoke <em>a small set of named operators</em>
+          generates fewer wrong programs than one let loose on raw threads, futures, and ad-hoc
+          message buses. Parapet is that small set.
+        </p>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Constrained surface</h3>
+            <p>About a dozen DSL operators (<code>send</code>, <code>fork</code>, <code>race</code>, <code>offload</code>, …). No bare threads, no shared mutable state. Less room to be creative in the wrong direction.</p>
+          </article>
+          <article class="card">
+            <h3>Reviewable output</h3>
+            <p>A handler is a value. The PR diff <em>shows the program</em>, not the side effects. Easier to read than imperative <code>IO.race(…).flatMap(…)</code> blobs.</p>
+          </article>
+          <article class="card">
+            <h3>Failure is in scope</h3>
+            <p>The interpreter can drop, delay, duplicate, or partition messages. Generated systems become testable without containers — exactly the loop an agent can run on its own.</p>
+          </article>
+        </div>
+        <p class="muted small">
+          <strong>On the roadmap:</strong> a
+          <code>parapet-agent-pack</code> — system prompt, <code>.cursorrules</code> /
+          <code>AGENTS.md</code>, and a curated set of reference processes (counter, gossip ring,
+          sharded KV) — so any AI assistant working in a Parapet repo writes correct code from the
+          first prompt.
+        </p>
+        <p>
+          Start with
+          <a href="#first-process">First process →</a> and
+          <a href="#dsl-cheat">DSL cheatsheet →</a>. Then jump to
+          <a href="#errors">Errors are events →</a> to see how recovery composes.
+        </p>
+      </section>
+
+      <section class="section" id="path-fp">
+        <div class="section-heading">
+          <p class="eyebrow">Paths · For Scala FP engineers</p>
+          <h2>From Akka Typed &amp; cats-effect</h2>
+        </div>
+        <p>
+          If you've reached for <code>akka-typed</code> for typed actors or for
+          <code>cats-effect</code> alone for concurrency, Parapet sits between them: actor
+          semantics with cats-effect's <code>F[_]</code> polymorphism and a DSL you can interpret
+          differently for tests, tracing, or replay.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Concern</th><th>Akka Typed</th><th>cats-effect alone</th><th>Parapet</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Process / actor isolation</td><td>Yes</td><td>You build it</td><td>Yes (first-class)</td></tr>
+              <tr><td>Effect-polymorphic in <code>F[_]</code></td><td>No</td><td>Yes</td><td>Yes</td></tr>
+              <tr><td>Programs as inspectable values</td><td>No</td><td>Partially</td><td>Yes (Free over <code>FlowOp</code>)</td></tr>
+              <tr><td>Pluggable interpreter (tracing, replay)</td><td>No</td><td>No</td><td>Yes</td></tr>
+              <tr><td>Typed mailboxes</td><td>Yes</td><td>—</td><td><em>Roadmap:</em> <code>ProcessRef[-In &lt;: Event]</code></td></tr>
+              <tr><td>Built-in distributed primitives</td><td>Yes (heavy)</td><td>—</td><td>Yes (small, composable)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Start with <a href="#learn-dsl">Composable DSL →</a>, then
+          <a href="#learn-free">The free encoding →</a>, and finally
+          <a href="#learn-extend-op">Add a custom <code>FlowOp</code> →</a> to see how the substrate
+          extends without forking the core.
+        </p>
+      </section>
+
+      <section class="section" id="path-platform">
+        <div class="section-heading">
+          <p class="eyebrow">Paths · For data &amp; infra teams</p>
+          <h2>From Flink, Akka, Kafka Connect</h2>
+        </div>
+        <p>
+          The big distributed substrates share a shape: <em>processes / operators, supervision,
+          transports, and a fixed bundle of guarantees baked in</em>. Parapet keeps the shape but
+          unbundles the guarantees — broadcast, replication, failure detection, and consensus are
+          interchangeable connectors, not load-bearing parts of the runtime.
+        </p>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Swap the algorithm, not the app</h3>
+            <p>Move from gossip to total-order broadcast, or from a heartbeat detector to phi-accrual, without touching domain code. Same operator surface, different guarantee.</p>
+          </article>
+          <article class="card">
+            <h3>Build up, not down</h3>
+            <p>Express your system at the level of <em>processes that exchange events</em>. The runtime, transport, and replication strategy are decisions you can defer or revisit.</p>
+          </article>
+          <article class="card">
+            <h3>Smaller surface</h3>
+            <p>No cluster controller, no operator graph runtime, no required deployment topology. The pieces are libraries; you assemble what you need.</p>
+          </article>
+        </div>
+        <p>
+          Start with <a href="#net-overview">Transport traits →</a> and
+          <a href="#modules">Module map →</a>, then read the
+          <a href="#roadmap">Roadmap →</a> to see where reliable channels, sharding, and dataflow
+          fit.
+        </p>
+      </section>
+
+      <section class="section" id="install">
+        <div class="section-heading">
+          <p class="eyebrow">Introduction</p>
+          <h2>Install</h2>
+        </div>
+        <p>
+          Add <code>parapet-core</code> to model processes. Add a runtime integration —
+          <code>parapet-cats-effect</code> for production, <code>parapet-pario</code> for the
+          reference runtime — when you want to run an application.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>libraryDependencies ++= Seq(
+  "io.parapet" %% "parapet-core"        % version,
+  "io.parapet" %% "parapet-cats-effect" % version
+)</code></pre>
+        </div>
+        <p>For snapshots, enable Sonatype Central snapshots:</p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>resolvers += "central-snapshots" at
+  "https://central.sonatype.com/repository/maven-snapshots/"</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="first-process">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">Introduction</p>
+            <h2>First process</h2>
+          </div>
+          <p>
+            A process declares its API as events and reacts to them in <code>handle</code>. The
+            handler is generic in <code>F[_]</code>, so the same process can be interpreted by any
+            runtime that provides the required capabilities.
+          </p>
+          <p>
+            <code>ProcessRef</code> is the address. Keep wiring late-bound by passing refs rather
+            than process instances.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>import io.parapet.{Event, ProcessRef}
+import io.parapet.core.Process
+import io.parapet.core.Events.Start
+
+class Printer[F[_]] extends Process[F]:
+  import Printer.*
+  import dsl.*
+
+  override def handle: Receive =
+    case Print(data) =&gt; eval(println(data))
+
+object Printer:
+  final case class Print(data: Any) extends Event
+
+class Greeter[F[_]](printer: ProcessRef) extends Process[F]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Start =&gt; Printer.Print("hello world") ~&gt; printer</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="run-app">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">Introduction</p>
+            <h2>Run an app</h2>
+          </div>
+          <p>
+            Specialize at the application boundary. For production Scala FP applications, mix
+            <code>CatsEffectParApp</code>.
+          </p>
+          <p>
+            <code>processes</code> returns an effect that yields the seed population — anything else
+            you need (channels, child processes) can be registered from inside <code>Start</code>.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>import cats.effect.IO
+import io.parapet.cats.CatsEffectParApp
+import io.parapet.core.Process
+
+object HelloApp extends CatsEffectParApp:
+  def processes(args: Array[String]): IO[Seq[Process[IO]]] =
+    IO.delay {
+      val printer = new Printer[IO]
+      val greeter = new Greeter[IO](printer.ref)
+      Seq(printer, greeter)
+    }</code></pre>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           LEARN
+           ============================================================ -->
+      <section class="section" id="learn-fa">
+        <div class="section-heading">
+          <p class="eyebrow">Learn</p>
+          <h2>The <code>F[_]</code> algebra</h2>
+        </div>
+        <p>
+          <code>F[_]</code> is a <em>type constructor</em>: it takes a type and produces another
+          one. <code>F[Int]</code> means "a description of a computation that, when interpreted,
+          produces an <code>Int</code>". The shape of that description is left abstract on purpose
+          — different effect runtimes encode it differently:
+        </p>
+        <ul>
+          <li><code>cats.effect.IO[A]</code> — Cats Effect's asynchronous, cancellable runtime.</li>
+          <li><code>io.parapet.effect.ParIO[A]</code> — Parapet's reference runtime.</li>
+          <li>Your own monad, as long as you can provide the required type-class instances.</li>
+        </ul>
+        <p>
+          Parapet code is written against <code>F[_]</code> + a small set of capability traits.
+          That keeps domain logic decoupled from any one runtime, and turns the choice of effect
+          system into an end-of-the-world decision instead of one that bleeds into every module.
+        </p>
+      </section>
+
+      <section class="section" id="learn-effect">
+        <div class="section-heading">
+          <p class="eyebrow">Learn</p>
+          <h2>Effect &amp; effect systems</h2>
+        </div>
+        <p>
+          An <strong>effect</strong> is anything that interacts with the outside world or changes
+          observable state: printing, reading a file, sleeping, sending a network packet,
+          mutating a counter. A <strong>pure</strong> function only computes a value from its
+          inputs.
+        </p>
+        <p>
+          An <strong>effect system</strong> is the part of a runtime that lets you build, combine,
+          and execute descriptions of effects without performing them eagerly. In Parapet this is
+          the <code>Effect[F]</code> type-class plus its companions:
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>trait Effect[F[_]]:
+  def pure[A](value: A): F[A]
+  def delay[A](thunk: =&gt; A): F[A]
+  def suspend[A](thunk: =&gt; F[A]): F[A]
+  def blocking[A](thunk: =&gt; A): F[A]
+  def raiseError[A](error: Throwable): F[A]
+  extension [A](fa: F[A])
+    def flatMap[B](f: A =&gt; F[B]): F[B]
+    def map[B](f: A =&gt; B): F[B]
+    def handleErrorWith(f: Throwable =&gt; F[A]): F[A]</code></pre>
+        </div>
+        <p>
+          A process never calls <code>Effect</code> directly. It produces a <code>DslF[F, Unit]</code>
+          program — the runtime's interpreter is the one that lifts each <code>FlowOp</code> into
+          an <code>F</code>-effect.
+        </p>
+      </section>
+
+      <section class="section" id="learn-dsl">
+        <div class="section-heading">
+          <p class="eyebrow">Learn</p>
+          <h2>Composable DSL</h2>
+        </div>
+        <p>
+          Inside a handler, you build a small <em>program</em> using DSL operators such as
+          <code>send</code>, <code>fork</code>, <code>delay</code>, and <code>race</code>. These
+          operators do not perform anything on their own — they return values describing what
+          should happen, which the runtime later executes.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>// A program: "send Ping to peer, wait 100ms, send Pong to peer"
+val program: DslF[F, Unit] =
+  Ping ~&gt; peer ++ delay(100.millis) ++ Pong ~&gt; peer</code></pre>
+        </div>
+        <p>
+          Because the program is a value, you can store it, log it, test it under a fake
+          interpreter, return it from a function that takes parameters, or compose it with another
+          program with <code>++</code>. This is the headline benefit of an effect system: behavior
+          becomes data.
+        </p>
+      </section>
+
+      <section class="section" id="learn-free">
+        <div class="section-heading">
+          <p class="eyebrow">Learn</p>
+          <h2>The free encoding</h2>
+        </div>
+        <p>
+          Under the hood, a <code>DslF[F, A]</code> is a <code>Free[FlowOp[F, *], A]</code> — an
+          immutable tree of <code>FlowOp</code> nodes leading to a final result. The
+          <code>DslInterpreter</code> walks that tree and turns each node into an <code>F</code>-
+          effect that the chosen runtime can execute.
+        </p>
+        <p>
+          You do not need to know category theory to use Parapet. The encoding matters because it
+          guarantees three properties:
+        </p>
+        <ul>
+          <li><strong>No accidental side effects at construction</strong> — building a program does not run it.</li>
+          <li><strong>Substitution works</strong> — equal programs produce equal effects.</li>
+          <li><strong>Inspection is possible</strong> — interpreters can rewrite, trace, or reorder.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="learn-extend-op">
+        <div class="section-heading">
+          <p class="eyebrow">Learn</p>
+          <h2>Add a custom <code>FlowOp</code></h2>
+        </div>
+        <p>
+          The DSL is open: you can mix the parapet algebra with your own and route the extra cases
+          through a tailor-made interpreter. The pattern is three steps — declare the new op,
+          expose a smart constructor, then teach the interpreter how to run it.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>// 1. Declare the op as a data type — pure, no behavior yet.
+import io.parapet.free.{Free, Inject}
+
+sealed trait MetricOp[F[_], A]
+final case class Counter[F[_]](name: String, delta: Long)
+    extends MetricOp[F, Unit]
+final case class Timer[F[_], A](name: String, body: Free[MetricOp[F, _], A])
+    extends MetricOp[F, A]
+
+// 2. A smart constructor that lifts the op into your program type.
+final class MetricOps[F[_], C[_]](using inject: Inject[[x] =&gt;&gt; MetricOp[F, x], C]):
+  def increment(name: String, delta: Long = 1L): Free[C, Unit] =
+    Free.inject[[x] =&gt;&gt; MetricOp[F, x], C, Unit](Counter[F](name, delta))
+
+  def time[A](name: String)(body: Free[MetricOp[F, _], A]): Free[C, A] =
+    Free.inject[[x] =&gt;&gt; MetricOp[F, x], C, A](Timer[F, A](name, body))</code></pre>
+        </div>
+        <p>
+          Programs that mix your algebra with the built-in one now type-check naturally. They are
+          still pure values; the runtime decides what each node means.
+        </p>
+      </section>
+
+      <section class="section" id="learn-extend-interp">
+        <div class="section-heading">
+          <p class="eyebrow">Learn</p>
+          <h2>Extend the interpreter</h2>
+        </div>
+        <p>
+          A custom interpreter is a <code>FunctionK</code> from your algebra to <code>F</code>.
+          Provide one that handles the new nodes; everything else delegates to the default Parapet
+          interpreter. Override <code>ParApp.interpreter</code> (or your runtime equivalent) to
+          plug it in.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>import io.parapet.core.DslInterpreter.Interpreter
+import io.parapet.free.{FunctionK, ~&gt;}
+
+final class MetricInterpreter[F[_]](underlying: Interpreter[F])(using metrics: Metrics[F])
+    extends Interpreter[F]:
+
+  def interpret(sender: ProcessRef, target: ProcessRef, trace: ExecutionTrace) =
+    new FunctionK[[x] =&gt;&gt; MetricOp[F, x], F]:
+      def apply[A](op: MetricOp[F, A]): F[A] = op match
+        case Counter(name, delta)  =&gt; metrics.add(name, delta)
+        case Timer(name, body)     =&gt; metrics.time(name)(
+          body.foldMap(interpret(sender, target, trace))
+        )
+  // ... delegate the two other interpret(...) overloads to `underlying`.</code></pre>
+        </div>
+        <p>
+          Custom interpreters are the right place for cross-cutting concerns that do not belong in
+          domain handlers: structured logging, distributed tracing, metrics, audit, replay.
+        </p>
+      </section>
+
+      <!-- ============================================================
+           CORE CONCEPTS
+           ============================================================ -->
+      <section class="section" id="process-model">
+        <div class="section-heading">
+          <p class="eyebrow">Core concepts</p>
+          <h2>Process model</h2>
+        </div>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Isolated state</h3>
+            <p>Each process owns its mailbox. The runtime serializes handler invocations per process.</p>
+          </article>
+          <article class="card">
+            <h3>Typed behavior</h3>
+            <p>Handlers return DSL programs, not callbacks. Replace behavior at runtime with <code>switch</code>.</p>
+          </article>
+          <article class="card">
+            <h3>Supervision graph</h3>
+            <p><code>register</code> sets up parent / child relations. <code>Stop</code> cascades down.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="lifecycle">
+        <div class="section-heading">
+          <p class="eyebrow">Core concepts</p>
+          <h2>Process lifecycle</h2>
+        </div>
+        <p>
+          Every process moves through the same four-stage lifecycle, driven by ordinary events the
+          handler can observe and react to.
+        </p>
+        <ol>
+          <li><strong>Registration.</strong> The application returns a process from <code>processes(args)</code>, or another process calls <code>register(parent, child)</code>. The runtime allocates a mailbox and wires the supervision graph.</li>
+          <li><strong>Start.</strong> The runtime delivers <code>Events.Start</code> as the first event. Use it to send "ready" notifications, register children, open resources.</li>
+          <li><strong>Running.</strong> Events are delivered in mailbox order; <code>handle</code> is invoked sequentially. Failures inside the handler are converted into a <code>Failure</code> event for the sender.</li>
+          <li><strong>Stop.</strong> On graceful shutdown the runtime first stops every child, then delivers <code>Events.Stop</code> to the parent. <code>Kill</code> tears the process down without running <code>handle</code>.</li>
+        </ol>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>class Server[F[_]] extends Process[F]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Start =&gt;
+      eval(println("opening port 8080"))
+    case Stop =&gt;
+      eval(println("draining and closing"))</code></pre>
+        </div>
+      </section>
+
+      <section class="section" id="system-events">
+        <div class="section-heading">
+          <p class="eyebrow">Core concepts</p>
+          <h2>System events</h2>
+        </div>
+        <p>
+          System events live in <code>io.parapet.core.Events</code>. They appear in handlers just
+          like domain events, so there are no special hooks to learn.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Event</th><th>When it is delivered</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>Start</code></td><td>Once, immediately after registration. Use for setup and to send "ready" pings.</td></tr>
+              <tr><td><code>Stop</code></td><td>Once, during graceful shutdown. Children receive <code>Stop</code> before their parent.</td></tr>
+              <tr><td><code>Kill</code></td><td>Forces termination without invoking <code>handle</code>. The mailbox is discarded.</td></tr>
+              <tr><td><code>Failure(envelope, error)</code></td><td>Routed back to the original sender when the receiver's handler raised. The sender can recover, retry, or escalate; unhandled failures become dead letters.</td></tr>
+              <tr><td><code>DeadLetter(envelope, error)</code></td><td>Wraps an envelope that could not be delivered (unknown receiver, terminated process, unhandled <code>Failure</code>). Routed to the configured <code>DeadLetterProcess</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="switch">
+        <div class="section-heading">
+          <p class="eyebrow">Core concepts</p>
+          <h2>Switching behavior</h2>
+        </div>
+        <p>
+          A process can replace its active receive function with <code>switch(newReceive)</code>.
+          The swap is synchronous within the current program, so it composes naturally with
+          state-machine flows.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>class Door[F[_]] extends Process[F]:
+  import dsl.*
+
+  private def closed: Receive =
+    case Open  =&gt; eval(println("opening")) ++ switch(opened)
+    case Knock =&gt; eval(println("knock knock"))
+
+  private def opened: Receive =
+    case Close =&gt; eval(println("closing")) ++ switch(closed)
+    case Enter =&gt; eval(println("welcome"))
+
+  override def handle: Receive = closed</code></pre>
+        </div>
+      </section>
+
+      <section class="section" id="combinators">
+        <div class="section-heading">
+          <p class="eyebrow">Core concepts</p>
+          <h2>Process combinators</h2>
+        </div>
+        <p>
+          Processes themselves compose: <code>a ++ b</code> (alias <code>a.and(b)</code>) creates a
+          process that runs both handlers when both can handle the event; <code>a.or(b)</code>
+          tries <code>a</code> first and falls back to <code>b</code>. The resulting process
+          inherits the left-hand <code>ref</code> and <code>name</code>.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>val core    = Process[F](_ =&gt; { case Ping =&gt; reply(Pong) })
+val metrics = Process[F](_ =&gt; { case Ping =&gt; eval(counter.incrementAndGet()) })
+
+val instrumented = core ++ metrics  // same ref as `core`</code></pre>
+        </div>
+      </section>
+
+      <section class="section" id="channels">
+        <div class="section-heading">
+          <p class="eyebrow">Core concepts</p>
+          <h2>Channel</h2>
+        </div>
+        <p>
+          <code>Channel</code> turns the asynchronous mailbox model into a strict one-call-at-a-time
+          dialog. It is useful when a handler needs a direct response before continuing, without
+          inventing correlation ids by hand.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>val client = ProcessRef("client")
+val ch     = new Channel[F](client)
+
+val flow =
+  register(client, ch) ++
+    ch.send(Request("ping"), server.ref).flatMap {
+      case scala.util.Success(Response(data)) =&gt; eval(println(s"got $data"))
+      case scala.util.Failure(err)            =&gt; eval(println(s"failed: $err"))
+    }</code></pre>
+        </div>
+        <p>
+          A channel rejects new requests while a request is in flight, which keeps the
+          send-then-await pattern safe without locks.
+        </p>
+      </section>
+
+      <section class="section" id="errors">
+        <div class="section-heading">
+          <p class="eyebrow">Core concepts</p>
+          <h2>Errors are events</h2>
+        </div>
+        <p>
+          When a handler raises, the runtime routes a <code>Failure(envelope, error)</code> event
+          back to the original sender. Senders that handle <code>Failure</code> can retry,
+          escalate, or convert the error into a domain event; senders that do not see one route
+          the failure to the dead-letter sink.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>class Client[F[_]](server: ProcessRef) extends Process[F]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Start =&gt;
+      Request("hello") ~&gt; server
+    case Failure(env, err) =&gt;
+      eval(println(s"server $server failed: ${err.getMessage}; retrying")) ++
+        env.event ~&gt; env.receiver</code></pre>
+        </div>
+      </section>
+
+      <section class="section" id="deadletter">
+        <div class="section-heading">
+          <p class="eyebrow">Core concepts</p>
+          <h2>Dead-letter</h2>
+        </div>
+        <p>
+          A <code>DeadLetter</code> wraps an envelope the runtime could not deliver — the receiver
+          does not exist, has been terminated, or returned a <code>Failure</code> the sender did not
+          handle. Dead letters are routed to a single well-known process whose <code>ref</code> is
+          <code>ProcessRef.DeadLetterRef</code>.
+        </p>
+        <p>
+          The default implementation logs every dead letter with structured fields. Override
+          <code>ParApp.deadLetter</code> to plug in your own — typical replacements push to a
+          message bus, surface metrics, or persist the envelope for replay.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>import io.parapet.core.processes.DeadLetterProcess
+
+class AlertingDeadLetters[F[_]] extends DeadLetterProcess[F]:
+  import dsl.*
+
+  override val handle: Receive = {
+    case DeadLetter(env, err) =&gt;
+      eval(metrics.deadLetters.increment()) ++
+        alerts.publish(env, err)
+  }
+
+object MyApp extends CatsEffectParApp:
+  override def deadLetter: IO[DeadLetterProcess[IO]] =
+    IO.pure(new AlertingDeadLetters[IO])
+
+  def processes(args: Array[String]): IO[Seq[Process[IO]]] = ...</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="configuration">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">Core concepts</p>
+            <h2>Configuration</h2>
+          </div>
+          <p>
+            <code>ParConfig</code> tunes the runtime: default mailbox capacity, scheduler thread
+            count, dev-mode logging, tracing, and the optional in-memory event log used for
+            replay.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>override def config =
+  ParConfig.default
+    .withProcessBufferSize(1024)
+    .withWorkerCount(8)
+    .enableTracing
+    .enableEventLog</code></pre>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           DSL REFERENCE
+           ============================================================ -->
+      <section class="section" id="dsl-cheat">
+        <div class="section-heading">
+          <p class="eyebrow">DSL reference</p>
+          <h2>Cheatsheet</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Operator</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>unit</code> / <code>pure(a)</code></td><td>Do nothing / lift a value.</td></tr>
+              <tr><td><code>flow { ... }</code></td><td>Defer construction (for recursion).</td></tr>
+              <tr><td><code>event ~&gt; ref</code></td><td>Send an event.</td></tr>
+              <tr><td><code>forward(event, ref)</code></td><td>Send while preserving the original sender.</td></tr>
+              <tr><td><code>reply(event)</code> / <code>withSender(f)</code></td><td>Reply to the sender of the current event.</td></tr>
+              <tr><td><code>eval { ... }</code></td><td>Lift a plain side-effecting computation.</td></tr>
+              <tr><td><code>suspend(fa)</code></td><td>Lift an existing <code>F</code>-effect.</td></tr>
+              <tr><td><code>delay(d)</code></td><td>Sleep for <code>d</code> without blocking a thread.</td></tr>
+              <tr><td><code>fork(flow)</code></td><td>Start a fiber; returns a join/cancel handle.</td></tr>
+              <tr><td><code>par(p1, p2, ...)</code></td><td>Fork each flow and return a list of fibers.</td></tr>
+              <tr><td><code>race(p1, p2)</code></td><td>Run both, return the winner, cancel the loser.</td></tr>
+              <tr><td><code>offload(flow)</code></td><td>Run in the background; gate next mailbox event.</td></tr>
+              <tr><td><code>register(parent, child)</code></td><td>Add a supervised child.</td></tr>
+              <tr><td><code>halt(ref)</code></td><td>Stop a process and its descendants.</td></tr>
+              <tr><td><code>handleError(body, recover)</code></td><td>DSL <code>try / catch</code>.</td></tr>
+              <tr><td><code>guarantee(body, finalizer)</code></td><td>DSL <code>try / finally</code>.</td></tr>
+              <tr><td><code>switch(receive)</code></td><td>Replace the active receive function.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-unit">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>unit · pure · flow</h2>
+          </div>
+          <p>
+            <code>unit</code> is a program that does nothing — useful as a fold seed or to give a
+            handler clause an explicit "do nothing" body. <code>pure(a)</code> lifts a value into a
+            program. <code>flow { ... }</code> defers construction; use it for recursive flows so
+            the recursion happens at interpretation time instead of construction time.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>// Empty branches.
+{
+  case Start =&gt; unit
+  case Stop  =&gt; unit
+}
+
+// Folding over a list.
+processes
+  .map(event ~&gt; _)
+  .foldLeft(unit)(_ ++ _)
+
+// Safe recursion.
+def times[F[_]](n: Int): DslF[F, Unit] = flow {
+  if n == 0 then unit
+  else eval(print(n)) ++ times(n - 1)
+}</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-send">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>send · <code>~&gt;</code></h2>
+          </div>
+          <p>
+            Sends an event to one or more receivers. The current process is recorded as the sender.
+            <code>~&gt;</code> is the symbolic alias for the single-receiver case. Events are
+            constructed lazily, so the runtime can elide construction when delivery is impossible.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>// Single receiver.
+Ping ~&gt; peer
+
+// Batch sequence to one receiver.
+Seq(Step1, Step2, Step3) ~&gt; pipeline
+
+// Fan-out, ordered enqueue across receivers.
+send(Ping, processA, processB, processC)</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-forward">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>forward</h2>
+          </div>
+          <p>
+            Forwards an event while preserving the sender of the message currently being handled.
+            The standard building block for proxy processes.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>val server = Process[F](_ =&gt; {
+  case Request(body) =&gt;
+    withSender(sender =&gt; eval(println(s"$sender: $body")))
+})
+
+val proxy = Process[F](_ =&gt; {
+  case Request(body) =&gt;
+    forward(Request(s"proxy/$body"), server.ref)
+})
+
+// Output: "client: proxy/ping" — the proxy disappears from sender attribution.</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-reply">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>reply · withSender</h2>
+          </div>
+          <p>
+            <code>withSender</code> hands you the sender's <code>ProcessRef</code>; <code>reply</code>
+            is sugar for the common "send something back" case. If the event has no real sender
+            (e.g. a system event), the reply is routed to the system / dead-letter ref.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>val echo = Process[F](_ =&gt; {
+  case Request(data) =&gt; reply(Response(s"echo: $data"))
+})
+
+val logger = Process[F](_ =&gt; {
+  case event =&gt; withSender(sender =&gt; eval(println(s"$sender sent $event")))
+})
+
+// Batch reply preserves order.
+val acker = Process[F](_ =&gt; {
+  case Batch(items) =&gt; reply(items.map(Ack(_)))
+})</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-eval">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>eval · suspend</h2>
+          </div>
+          <p>
+            <code>eval</code> lifts a plain side-effecting expression into the DSL.
+            <code>suspend</code> lifts an existing <code>F</code>-effect. Reach for
+            <code>suspend</code> only when you already hold an <code>F[A]</code>; <code>eval</code>
+            covers everything else.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>// Plain side effect.
+eval(println("hello"))
+
+// Lift an existing F-effect.
+suspend(database.fetch(id))
+
+// Capture a result.
+for
+  value &lt;- eval(System.currentTimeMillis())
+  _     &lt;- eval(println(s"at $value"))
+yield ()</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-delay">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>delay</h2>
+          </div>
+          <p>
+            Suspends subsequent steps for <code>duration</code> without blocking a thread on
+            runtimes that support async sleep. Inside <code>par</code>, only the first step is
+            delayed; wrap each branch to delay every one individually.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>// Delay once before the whole block.
+delay(2.seconds) ++ Tick ~&gt; clock
+
+// Delay every parallel branch.
+par(
+  delay(1.second) ++ eval(print("a")),
+  delay(2.seconds) ++ eval(print("b"))
+)</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-fork">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>fork · par</h2>
+          </div>
+          <p>
+            <code>fork(flow)</code> starts a fiber and returns its handle. <code>par(p1, p2, ...)</code>
+            forks each program in parallel and gives back a list of handles. Use
+            <code>fiber.join</code> to await a value and <code>fiber.cancel</code> to abort.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>for
+  fiber  &lt;- fork(eval(computeExpensiveResult()))
+  // ... other work ...
+  result &lt;- fiber.join
+  _      &lt;- eval(println(s"got $result"))
+yield ()
+
+// Run independent steps concurrently.
+par(eval(print("1")), eval(print("2")), eval(print("3")))</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-race">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>race</h2>
+          </div>
+          <p>
+            Runs two flows concurrently and returns whichever wins; the loser is cancelled. The
+            canonical pattern for timeouts and fastest-responder fan-out.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>// Timeout pattern.
+race(
+  server.send(Request, _ =&gt; unit),
+  delay(5.seconds) ++ eval(println("server timed out"))
+)
+
+// Fastest replica wins.
+race(
+  ch.send(Request, replicaA),
+  ch.send(Request, replicaB)
+)</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-offload">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>offload</h2>
+          </div>
+          <p>
+            Runs <code>flow</code> on a background fiber so it does not stall scheduler workers.
+            Subsequent steps in the same handler may proceed immediately, but the process will not
+            accept its next mailbox event until all offloaded work has completed.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>class IndexingProcess[F[_]](store: Store[F]) extends Process[F]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Index(record) =&gt;
+      offload(suspend(store.write(record)))
+    case Stop =&gt;
+      eval(println("done indexing"))</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-register">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>register · halt</h2>
+          </div>
+          <p>
+            <code>register(parent, child)</code> adds a child to the supervision graph; children
+            receive <code>Stop</code> before their parent. <code>halt(ref)</code> stops a process
+            and cascades to its descendants.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>class Pool[F[_]] extends Process[F]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Start =&gt;
+      register(ref,
+        new Worker[F]("worker-1"),
+        new Worker[F]("worker-2")
+      )
+    case Shutdown =&gt;
+      halt(ref)</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="dsl-error">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">DSL reference</p>
+            <h2>handleError · guarantee</h2>
+          </div>
+          <p>
+            <code>handleError</code> is DSL <code>try / catch</code>; <code>guarantee</code> is DSL
+            <code>try / finally</code>. Use them to keep recovery and cleanup inside the program
+            value rather than the underlying effect.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>handleError(
+  eval(throw RuntimeException("boom")),
+  err =&gt; eval(println(s"recovered from ${err.getMessage}"))
+)
+
+guarantee(
+  eval(openFile()),
+  eval(closeFile())
+)</code></pre>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           NETWORK
+           ============================================================ -->
+      <section class="section" id="net-overview">
+        <div class="section-heading">
+          <p class="eyebrow">Network</p>
+          <h2>Transport traits</h2>
+        </div>
+        <p>
+          <code>parapet-net</code> defines three small traits that describe how bytes move on and
+          off the wire. The concrete transport is pluggable — Aeron, ZMQ, or your own.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Trait</th><th>Shape</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>RequestResponseClient[F]</code></td><td>Synchronous-style <code>request: Array[Byte] =&gt; F[Option[Array[Byte]]]</code>.</td></tr>
+              <tr><td><code>RequestResponseServer[F]</code></td><td>Polls inbound <code>ReceivedFrame</code>s; replies via <code>reply(clientId, payload)</code>.</td></tr>
+              <tr><td><code>DatagramTransport[F]</code></td><td>UDP-style fan-out: <code>publish</code> / <code>receiveBatch</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The adapter processes in <code>io.parapet.net.processes</code> lift these traits into the
+          process world: each transport sits behind a process, so the rest of the system only ever
+          sees events.
+        </p>
+      </section>
+
+      <section class="section two-column" id="net-tcp-server">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">Network</p>
+            <h2>TCP server process</h2>
+          </div>
+          <p>
+            <code>TcpServerProcess</code> wraps a <code>RequestResponseServer</code>. On
+            <code>Start</code> it forks a loop that drains inbound frames and forwards each one to
+            a sink process as <code>Cmd.netServer.Message(clientId, payload)</code>. To reply, send
+            it <code>Cmd.netServer.Send(clientId, payload)</code>.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>import io.parapet.core.api.Cmd
+import io.parapet.net.processes.TcpServerProcess
+
+class Echo[F[_]] extends Process[F]:
+  import dsl.*
+  override def handle: Receive =
+    case Cmd.netServer.Message(clientId, payload) =&gt;
+      Cmd.netServer.Send(clientId, payload) ~&gt; ProcessRef("net-tcp-server")
+
+val echo   = new Echo[F]
+val server = new TcpServerProcess[F](transport, sink = echo.ref)</code></pre>
+        </div>
+      </section>
+
+      <section class="section two-column" id="net-tcp-client">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">Network</p>
+            <h2>TCP client process</h2>
+          </div>
+          <p>
+            <code>TcpClientProcess</code> wraps a <code>RequestResponseClient</code>. Send it
+            <code>Cmd.netClient.Send(payload, replyTo)</code> and the reply (or <code>None</code>
+            on failure) is delivered back to <code>replyTo</code> as
+            <code>Cmd.netClient.Rep</code>.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>import io.parapet.net.processes.TcpClientProcess
+
+class Caller[F[_]](client: ProcessRef) extends Process[F]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Start =&gt;
+      Cmd.netClient.Send("ping".getBytes, replyTo = Some(ref)) ~&gt; client
+    case Cmd.netClient.Rep(Some(bytes)) =&gt;
+      eval(println(s"got ${new String(bytes)}"))
+    case Cmd.netClient.Rep(None) =&gt;
+      eval(println("timed out"))</code></pre>
+        </div>
+      </section>
+
+      <section class="section" id="net-tcp-app">
+        <div class="section-heading">
+          <p class="eyebrow">Network</p>
+          <h2>Two processes over TCP</h2>
+        </div>
+        <p>
+          A complete app: an echo server in one JVM, a caller in another. Same domain code, the
+          only difference is what each side registers.
+        </p>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>import cats.effect.IO
+import io.parapet.cats.CatsEffectParApp
+import io.parapet.core.Process
+import io.parapet.net.zmq.ZmqTcp
+import io.parapet.net.processes.{TcpClientProcess, TcpServerProcess}
+
+object ServerApp extends CatsEffectParApp:
+  def processes(args: Array[String]) =
+    for transport &lt;- ZmqTcp.server[IO](bind = "tcp://*:5555")
+    yield
+      val echo   = new Echo[IO]
+      val server = new TcpServerProcess[IO](transport, sink = echo.ref)
+      Seq(echo, server)
+
+object ClientApp extends CatsEffectParApp:
+  def processes(args: Array[String]) =
+    for transport &lt;- ZmqTcp.client[IO](connect = "tcp://server:5555")
+    yield
+      val client = new TcpClientProcess[IO](transport)
+      val caller = new Caller[IO](client.ref)
+      Seq(client, caller)</code></pre>
+        </div>
+        <p>
+          Other transports plug in the same way: swap <code>ZmqTcp</code> for <code>AeronUdp</code>
+          or your own. The process layer never changes.
+        </p>
+      </section>
+
+      <!-- ============================================================
+           MODULES
+           ============================================================ -->
+      <section class="section" id="modules">
+        <div class="section-heading">
+          <p class="eyebrow">Modules</p>
+          <h2>Module map</h2>
+        </div>
+        <div class="module-list">
+          <article><strong>parapet-core</strong><span>Process model, DSL, scheduler, capability contracts.</span></article>
+          <article><strong>parapet-testkit</strong><span>Shared conformance specs for runtime implementations.</span></article>
+          <article><strong>parapet-cats-effect</strong><span>Recommended production backend for Cats Effect <code>IO</code>.</span></article>
+          <article><strong>parapet-pario</strong><span>Small reference runtime for learning and tests.</span></article>
+          <article><strong>parapet-protocol</strong><span>Wire codecs and the cross-module command vocabulary (<code>Cmd</code>).</span></article>
+          <article><strong>parapet-net</strong><span>TCP / UDP transports and adapter processes.</span></article>
+          <article><strong>parapet-examples</strong><span>End-to-end demos including the graph-coloring simulation.</span></article>
+        </div>
+      </section>
+
+      <section class="section two-column" id="runtime-choice">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">Modules</p>
+            <h2>Runtime choice</h2>
+          </div>
+          <p>
+            Use <code>parapet-cats-effect</code> when shipping. Use <code>parapet-pario</code> when
+            you want to read the runtime, write small examples, or validate a new backend.
+          </p>
+          <p>
+            Both implement the same capability contracts (<code>Effect</code>,
+            <code>Parallel</code>, <code>SchedulerRuntime</code>), so handlers are portable across
+            them with no code changes.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>// Production
+import io.parapet.cats.CatsEffectParApp
+object App extends CatsEffectParApp:
+  def processes(args: Array[String]) = IO.pure(Seq(...))
+
+// Reference runtime
+import io.parapet.ParIOApp
+import io.parapet.effect.ParIO
+object Sandbox extends ParIOApp:
+  def processes(args: Array[String]): ParIO[Seq[Process[ParIO]]] =
+    ParIO.pure(Seq(...))</code></pre>
+        </div>
+      </section>
+
+      <section class="section" id="testing">
+        <div class="section-heading">
+          <p class="eyebrow">Modules</p>
+          <h2>Testing</h2>
+        </div>
+        <p>
+          Because handlers are values, you can step a program through a test interpreter and
+          assert on the emitted events instead of standing up a real network. The shared
+          conformance specs in <code>parapet-testkit</code> are the same suite each backend has to
+          satisfy — they are also a useful checklist when writing your own scenarios.
+        </p>
+      </section>
+
+      <!-- ============================================================
+           PROJECT
+           ============================================================ -->
+      <section class="section" id="roadmap">
+        <div class="section-heading">
+          <p class="eyebrow">Project</p>
+          <h2>Roadmap</h2>
+        </div>
+        <p>
+          Parapet evolves in layers. Each layer is independently useful; later layers compose what
+          earlier ones expose. The guiding principle: small composable behaviours, not a monolithic
+          framework.
+        </p>
+        <div class="module-list">
+          <article>
+            <strong>Layer 0 · Protocol primitives</strong>
+            <span>Channel ✅. Reliable send, failure detector, membership, causal context, ordered broadcast, fencing tokens — on deck.</span>
+          </article>
+          <article>
+            <strong>Layer 1 · Replication &amp; state</strong>
+            <span>Raft 🟡 (snapshots / dynamic membership next). CRDT algebra, anti-entropy gossiper, pluggable replicated log.</span>
+          </article>
+          <article>
+            <strong>Layer 2 · Process patterns</strong>
+            <span>Sharding, cluster singleton, typed pub/sub, request router, saga orchestrator, rate limiter, durable timers.</span>
+          </article>
+          <article>
+            <strong>Layer 3 · Dataflow</strong>
+            <span>Operator graph, keyed state, watermarks, Chandy–Lamport checkpoint coordinator, exactly-once sinks.</span>
+          </article>
+          <article>
+            <strong>Layer 4 · Testing &amp; observability</strong>
+            <span>Real event log, deterministic scheduler, fault injection, causal tracing, lin-check harness, replay tooling.</span>
+          </article>
+          <article>
+            <strong>Layer 5 · Algorithm zoo</strong>
+            <span>Raft 🟡, Multi-Paxos, EPaxos, Zab, Chandy–Lamport, SWIM, HyParView / Plumtree, ABD register — reference implementations.</span>
+          </article>
+        </div>
+        <p>
+          The full plan, including the next milestone (CRDT toolkit + anti-entropy gossiper, then
+          sharding + cluster singleton) and anti-goals, lives in
+          <a href="https://github.com/parapet-io/parapet/blob/main/roadmap/ROADMAP.md"><code>roadmap/ROADMAP.md</code></a>.
+        </p>
+      </section>
+
+      <section class="section" id="status">
+        <div class="section-heading">
+          <p class="eyebrow">Project</p>
+          <h2>Status</h2>
+        </div>
+        <p>
+          Parapet is actively evolving. The core primitives are in place; higher-level modules
+          such as reliable channels, failure detectors, broadcast, gossip, CRDTs, sharding, and
+          observability grow independently.
+        </p>
+      </section>
+
+      <section class="section footer-section" id="links">
+        <div class="section-heading">
+          <p class="eyebrow">Project</p>
+          <h2>Links</h2>
+        </div>
+        <div class="link-row">
+          <a href="https://github.com/parapet-io/parapet">GitHub</a>
+          <a href="https://github.com/parapet-io/parapet/issues">Issues</a>
+          <a href="https://github.com/parapet-io/parapet/blob/main/LICENSE">License</a>
+        </div>
+        <p class="muted small">
+          parapet is published under the Apache License 2.0. Documentation is part of the
+          <a href="https://github.com/parapet-io/parapet-docs">parapet-docs</a> repo.
+        </p>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
