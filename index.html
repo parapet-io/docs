@@ -55,6 +55,7 @@
         <details class="nav-group">
           <summary>Core concepts</summary>
           <a href="#process-model">Process model</a>
+          <a href="#typed-refs">Typed refs</a>
           <a href="#lifecycle">Process lifecycle</a>
           <a href="#system-events">System events</a>
           <a href="#switch">Switching behavior</a>
@@ -71,7 +72,7 @@
           <a href="#dsl-unit">unit · pure · flow</a>
           <a href="#dsl-send">send · ~&gt;</a>
           <a href="#dsl-forward">forward</a>
-          <a href="#dsl-reply">reply · withSender</a>
+          <a href="#dsl-reply">reply</a>
           <a href="#dsl-eval">eval · suspend</a>
           <a href="#dsl-delay">delay</a>
           <a href="#dsl-fork">fork · par</a>
@@ -132,7 +133,7 @@
           <a class="onramp" href="#path-fp">
             <span class="onramp-tag">For Scala FP engineers</span>
             <strong>From Akka Typed &amp; cats-effect</strong>
-            <span class="onramp-copy">Effect-polymorphic, free-monad-encoded, runtime-agnostic. Typed mailboxes are on the roadmap.</span>
+            <span class="onramp-copy">Effect-polymorphic, free-monad-encoded, runtime-agnostic. Process protocols are typed.</span>
           </a>
           <a class="onramp" href="#path-platform">
             <span class="onramp-tag">For data &amp; infra teams</span>
@@ -274,7 +275,7 @@
               <tr><td>Effect-polymorphic in <code>F[_]</code></td><td>No</td><td>Yes</td><td>Yes</td></tr>
               <tr><td>Programs as inspectable values</td><td>No</td><td>Partially</td><td>Yes (Free over <code>FlowOp</code>)</td></tr>
               <tr><td>Pluggable interpreter (tracing, replay)</td><td>No</td><td>No</td><td>Yes</td></tr>
-              <tr><td>Typed mailboxes</td><td>Yes</td><td>—</td><td><em>Roadmap:</em> <code>ProcessRef[-In &lt;: Event]</code></td></tr>
+              <tr><td>Typed mailboxes</td><td>Yes</td><td>—</td><td>Typed process protocols and refs</td></tr>
               <tr><td>Built-in distributed primitives</td><td>Yes (heavy)</td><td>—</td><td>Yes (small, composable)</td></tr>
             </tbody>
           </table>
@@ -367,7 +368,7 @@
 import io.parapet.core.Process
 import io.parapet.core.Events.Start
 
-class Printer[F[_]] extends Process[F]:
+class Printer[F[_]] extends Process[F, Printer.Print, Nothing]:
   import Printer.*
   import dsl.*
 
@@ -377,7 +378,7 @@ class Printer[F[_]] extends Process[F]:
 object Printer:
   final case class Print(data: Any) extends Event
 
-class Greeter[F[_]](printer: ProcessRef) extends Process[F]:
+class Greeter[F[_]](printer: ProcessRef[Printer.Print]) extends Process[F, Event, Nothing]:
   import dsl.*
 
   override def handle: Receive =
@@ -407,7 +408,7 @@ import io.parapet.cats.CatsEffectParApp
 import io.parapet.core.Process
 
 object HelloApp extends CatsEffectParApp:
-  def processes(args: Array[String]): IO[Seq[Process[IO]]] =
+  def processes(args: Array[String]): IO[Seq[Process[IO, ?, ?]]] =
     IO.delay {
       val printer = new Printer[IO]
       val greeter = new Greeter[IO](printer.ref)
@@ -579,7 +580,7 @@ import io.parapet.free.{FunctionK, ~&gt;}
 final class MetricInterpreter[F[_]](underlying: Interpreter[F])(using metrics: Metrics[F])
     extends Interpreter[F]:
 
-  def interpret(sender: ProcessRef, target: ProcessRef, trace: ExecutionTrace) =
+  def interpret(sender: ProcessRef.Unknown, target: ProcessRef.Unknown, trace: ExecutionTrace) =
     new FunctionK[[x] =&gt;&gt; MetricOp[F, x], F]:
       def apply[A](op: MetricOp[F, A]): F[A] = op match
         case Counter(name, delta)  =&gt; metrics.add(name, delta)
@@ -608,13 +609,43 @@ final class MetricInterpreter[F[_]](underlying: Interpreter[F])(using metrics: M
             <p>Each process owns its mailbox. The runtime serializes handler invocations per process.</p>
           </article>
           <article class="card">
-            <h3>Typed behavior</h3>
-            <p>Handlers return DSL programs, not callbacks. Replace behavior at runtime with <code>switch</code>.</p>
+            <h3>Typed protocol</h3>
+            <p>A process declares the domain events it accepts, and refs carry that protocol through wiring.</p>
           </article>
           <article class="card">
             <h3>Supervision graph</h3>
             <p><code>register</code> sets up parent / child relations. <code>Stop</code> cascades down.</p>
           </article>
+        </div>
+      </section>
+
+      <section class="section two-column" id="typed-refs">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">Core concepts</p>
+            <h2>Typed refs</h2>
+          </div>
+          <p>
+            Declare a process protocol with <code>Process[F, In, Out]</code>, then pass around
+            <code>ProcessRef[In]</code> to keep wiring explicit.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>final case class Save(key: String, value: String) extends Event
+
+class Store[F[_]] extends Process[F, Save, Nothing]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Save(key, value) =&gt; eval(println(s"saved $key=$value"))
+    case Stop             =&gt; eval(println("closing store"))
+
+class Writer[F[_]](store: ProcessRef[Save]) extends Process[F, Event, Nothing]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Start =&gt; Save("hello", "world") ~&gt; store</code></pre>
         </div>
       </section>
 
@@ -635,7 +666,7 @@ final class MetricInterpreter[F[_]](underlying: Interpreter[F])(using metrics: M
         </ol>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>class Server[F[_]] extends Process[F]:
+          <pre><code>class Server[F[_]] extends Process[F, Event, Nothing]:
   import dsl.*
 
   override def handle: Receive =
@@ -683,7 +714,7 @@ final class MetricInterpreter[F[_]](underlying: Interpreter[F])(using metrics: M
         </p>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>class Door[F[_]] extends Process[F]:
+          <pre><code>class Door[F[_]] extends Process[F, Event, Nothing]:
   import dsl.*
 
   private def closed: Receive =
@@ -711,7 +742,11 @@ final class MetricInterpreter[F[_]](underlying: Interpreter[F])(using metrics: M
         </p>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>val core    = Process[F](_ =&gt; { case Ping =&gt; reply(Pong) })
+          <pre><code>class Core[F[_]] extends Process[F, Ping.type, Pong.type]:
+  override def handle: Receive =
+    case Ping =&gt; reply(Pong)
+
+val core    = new Core[F]
 val metrics = Process[F](_ =&gt; { case Ping =&gt; eval(counter.incrementAndGet()) })
 
 val instrumented = core ++ metrics  // same ref as `core`</code></pre>
@@ -730,7 +765,7 @@ val instrumented = core ++ metrics  // same ref as `core`</code></pre>
         </p>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>val client = ProcessRef("client")
+          <pre><code>val client: ProcessRef[Event] = ProcessRef("client")
 val ch     = new Channel[F](client)
 
 val flow =
@@ -759,7 +794,7 @@ val flow =
         </p>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>class Client[F[_]](server: ProcessRef) extends Process[F]:
+          <pre><code>class Client[F[_]](server: ProcessRef[Request]) extends Process[F, Event, Nothing]:
   import dsl.*
 
   override def handle: Receive =
@@ -804,7 +839,7 @@ object MyApp extends CatsEffectParApp:
   override def deadLetter: IO[DeadLetterProcess[IO]] =
     IO.pure(new AlertingDeadLetters[IO])
 
-  def processes(args: Array[String]): IO[Seq[Process[IO]]] = ...</code></pre>
+  def processes(args: Array[String]): IO[Seq[Process[IO, ?, ?]]] = ...</code></pre>
         </div>
       </section>
 
@@ -849,7 +884,7 @@ object MyApp extends CatsEffectParApp:
               <tr><td><code>flow { ... }</code></td><td>Defer construction (for recursion).</td></tr>
               <tr><td><code>event ~&gt; ref</code></td><td>Send an event.</td></tr>
               <tr><td><code>forward(event, ref)</code></td><td>Send while preserving the original sender.</td></tr>
-              <tr><td><code>reply(event)</code> / <code>withSender(f)</code></td><td>Reply to the sender of the current event.</td></tr>
+              <tr><td><code>reply(event)</code></td><td>Reply to the sender of the current event.</td></tr>
               <tr><td><code>eval { ... }</code></td><td>Lift a plain side-effecting computation.</td></tr>
               <tr><td><code>suspend(fa)</code></td><td>Lift an existing <code>F</code>-effect.</td></tr>
               <tr><td><code>delay(d)</code></td><td>Sleep for <code>d</code> without blocking a thread.</td></tr>
@@ -911,6 +946,7 @@ def times[F[_]](n: Int): DslF[F, Unit] = flow {
             Sends an event to one or more receivers. The current process is recorded as the sender.
             <code>~&gt;</code> is the symbolic alias for the single-receiver case. Events are
             constructed lazily, so the runtime can elide construction when delivery is impossible.
+            The compiler checks that the receiver accepts the event type.
           </p>
         </div>
         <div class="code-card">
@@ -939,17 +975,18 @@ send(Ping, processA, processB, processC)</code></pre>
         </div>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>val server = Process[F](_ =&gt; {
-  case Request(body) =&gt;
-    withSender(sender =&gt; eval(println(s"$sender: $body")))
-})
+          <pre><code>class Server[F[_]] extends Process[F, Request, Response]:
+  override def handle: Receive =
+    case Request(body) =&gt; reply(Response(s"server/$body"))
+
+val server = new Server[F]
 
 val proxy = Process[F](_ =&gt; {
   case Request(body) =&gt;
     forward(Request(s"proxy/$body"), server.ref)
 })
 
-// Output: "client: proxy/ping" — the proxy disappears from sender attribution.</code></pre>
+// Replies from server go back to the original sender, not to proxy.</code></pre>
         </div>
       </section>
 
@@ -957,28 +994,23 @@ val proxy = Process[F](_ =&gt; {
         <div>
           <div class="section-heading">
             <p class="eyebrow">DSL reference</p>
-            <h2>reply · withSender</h2>
+            <h2>reply</h2>
           </div>
           <p>
-            <code>withSender</code> hands you the sender's <code>ProcessRef</code>; <code>reply</code>
-            is sugar for the common "send something back" case. If the event has no real sender
-            (e.g. a system event), the reply is routed to the system / dead-letter ref.
+            <code>reply</code> sends an event back to the sender of the message currently being handled.
+            The event is checked against the process's declared output protocol.
           </p>
         </div>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>val echo = Process[F](_ =&gt; {
-  case Request(data) =&gt; reply(Response(s"echo: $data"))
-})
-
-val logger = Process[F](_ =&gt; {
-  case event =&gt; withSender(sender =&gt; eval(println(s"$sender sent $event")))
-})
+          <pre><code>class Echo[F[_]] extends Process[F, Request, Response]:
+  override def handle: Receive =
+    case Request(data) =&gt; reply(Response(s"echo: $data"))
 
 // Batch reply preserves order.
-val acker = Process[F](_ =&gt; {
-  case Batch(items) =&gt; reply(items.map(Ack(_)))
-})</code></pre>
+class Acker[F[_]] extends Process[F, Batch, Ack]:
+  override def handle: Receive =
+    case Batch(items) =&gt; reply(items.map(Ack(_)))</code></pre>
         </div>
       </section>
 
@@ -1103,7 +1135,7 @@ race(
         </div>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>class IndexingProcess[F[_]](store: Store[F]) extends Process[F]:
+          <pre><code>class IndexingProcess[F[_]](store: Store[F]) extends Process[F, Event, Nothing]:
   import dsl.*
 
   override def handle: Receive =
@@ -1128,7 +1160,7 @@ race(
         </div>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>class Pool[F[_]] extends Process[F]:
+          <pre><code>class Pool[F[_]] extends Process[F, Event, Nothing]:
   import dsl.*
 
   override def handle: Receive =
@@ -1217,11 +1249,12 @@ guarantee(
           <pre><code>import io.parapet.core.api.Cmd
 import io.parapet.net.processes.TcpServerProcess
 
-class Echo[F[_]] extends Process[F]:
+class Echo[F[_]] extends Process[F, Cmd.netServer.Message, Nothing]:
   import dsl.*
   override def handle: Receive =
     case Cmd.netServer.Message(clientId, payload) =&gt;
-      Cmd.netServer.Send(clientId, payload) ~&gt; ProcessRef("net-tcp-server")
+      val serverRef: ProcessRef[Cmd.netServer.Send] = ProcessRef("net-tcp-server")
+      Cmd.netServer.Send(clientId, payload) ~&gt; serverRef
 
 val echo   = new Echo[F]
 val server = new TcpServerProcess[F](transport, sink = echo.ref)</code></pre>
@@ -1245,7 +1278,7 @@ val server = new TcpServerProcess[F](transport, sink = echo.ref)</code></pre>
           <button class="copy-button" type="button">Copy</button>
           <pre><code>import io.parapet.net.processes.TcpClientProcess
 
-class Caller[F[_]](client: ProcessRef) extends Process[F]:
+class Caller[F[_]](client: ProcessRef[Cmd.netClient.Send]) extends Process[F, Cmd.netClient.Rep, Nothing]:
   import dsl.*
 
   override def handle: Receive =
@@ -1343,7 +1376,7 @@ object App extends CatsEffectParApp:
 import io.parapet.ParIOApp
 import io.parapet.effect.ParIO
 object Sandbox extends ParIOApp:
-  def processes(args: Array[String]): ParIO[Seq[Process[ParIO]]] =
+  def processes(args: Array[String]): ParIO[Seq[Process[ParIO, ?, ?]]] =
     ParIO.pure(Seq(...))</code></pre>
         </div>
       </section>
