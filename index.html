@@ -85,9 +85,10 @@
         <details class="nav-group">
           <summary>Network</summary>
           <a href="#net-overview">Transport traits</a>
-          <a href="#net-tcp-server">TCP server process</a>
-          <a href="#net-tcp-client">TCP client process</a>
-          <a href="#net-tcp-app">Two processes over TCP</a>
+          <a href="#net-tcp-server">TCP echo server</a>
+          <a href="#net-tcp-client">TCP ping client</a>
+          <a href="#net-tcp-app">ZMQ wiring</a>
+          <a href="#net-udp">UDP with Aeron</a>
         </details>
 
         <details class="nav-group">
@@ -1209,8 +1210,9 @@ guarantee(
           <h2>Transport traits</h2>
         </div>
         <p>
-          <code>parapet-net</code> defines three small traits that describe how bytes move on and
-          off the wire. The concrete transport is pluggable — Aeron, ZMQ, or your own.
+          <code>parapet-net</code> separates low-level byte transport from process-level events.
+          Today it ships TCP request/reply over ZMQ and UDP-style datagrams over Aeron; the same
+          process adapters can also wrap your own transport.
         </p>
         <div class="table-wrap">
           <table>
@@ -1218,16 +1220,17 @@ guarantee(
               <tr><th>Trait</th><th>Shape</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>RequestResponseClient[F]</code></td><td>Synchronous-style <code>request: Array[Byte] =&gt; F[Option[Array[Byte]]]</code>.</td></tr>
-              <tr><td><code>RequestResponseServer[F]</code></td><td>Polls inbound <code>ReceivedFrame</code>s; replies via <code>reply(clientId, payload)</code>.</td></tr>
-              <tr><td><code>DatagramTransport[F]</code></td><td>UDP-style fan-out: <code>publish</code> / <code>receiveBatch</code>.</td></tr>
+              <tr><td><code>ClientTransport[F]</code></td><td>Request/reply client: <code>request(Message) =&gt; F[Either[TransportError, Message]]</code>.</td></tr>
+              <tr><td><code>ServerTransport[F]</code></td><td>Polls <code>RoutedMessage</code>s and replies with <code>reply(routingId, message)</code>.</td></tr>
+              <tr><td><code>DatagramTransport[F]</code></td><td>UDP-style fan-out: <code>publish(Message)</code> / <code>receiveBatch(limit)</code>.</td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          The adapter processes in <code>io.parapet.net.processes</code> lift these traits into the
-          process world: each transport sits behind a process, so the rest of the system only ever
-          sees events.
+          The adapter processes in <code>io.parapet.net.processes</code> lift those traits into the
+          process world: <code>ClientProcess</code>, <code>ServerProcess</code>, and
+          <code>DatagramProcess</code>. Application code sends typed events; transport details stay
+          at the edge.
         </p>
       </section>
 
@@ -1235,29 +1238,36 @@ guarantee(
         <div>
           <div class="section-heading">
             <p class="eyebrow">Network</p>
-            <h2>TCP server process</h2>
+            <h2>TCP echo server</h2>
           </div>
           <p>
-            <code>TcpServerProcess</code> wraps a <code>RequestResponseServer</code>. On
-            <code>Start</code> it forks a loop that drains inbound frames and forwards each one to
-            a sink process as <code>Cmd.netServer.Message(clientId, payload)</code>. To reply, send
-            it <code>Cmd.netServer.Send(clientId, payload)</code>.
+            <code>ServerProcess</code> wraps a <code>ServerTransport</code>. It receives routed
+            messages from the transport and forwards them to a sink process as
+            <code>ServerProcess.Received</code>. To answer, send <code>ServerProcess.Reply</code>
+            back to the server process.
           </p>
         </div>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>import io.parapet.core.api.Cmd
-import io.parapet.net.processes.TcpServerProcess
+          <pre><code>import io.parapet.ProcessRef
+import io.parapet.core.Process
+import io.parapet.net.processes.ServerProcess
 
-class Echo[F[_]] extends Process[F, Cmd.netServer.Message, Nothing]:
+class Echo[F[_]](
+    server: ProcessRef[ServerProcess.Reply]
+) extends Process[F, ServerProcess.Received | ServerProcess.Failed, Nothing]:
   import dsl.*
-  override def handle: Receive =
-    case Cmd.netServer.Message(clientId, payload) =&gt;
-      val serverRef: ProcessRef[Cmd.netServer.Send] = ProcessRef("net-tcp-server")
-      Cmd.netServer.Send(clientId, payload) ~&gt; serverRef
 
-val echo   = new Echo[F]
-val server = new TcpServerProcess[F](transport, sink = echo.ref)</code></pre>
+  override def handle: Receive =
+    case ServerProcess.Received(routingId, message) =&gt;
+      ServerProcess.Reply(routingId, message) ~&gt; server
+    case ServerProcess.Failed(error) =&gt;
+      eval(println(s"server failed: $error"))
+
+val echoRef = ProcessRef[ServerProcess.Received | ServerProcess.Failed]("echo")
+val server  = new ServerProcess[F](transport, sink = echoRef)
+val echo   = new Echo[F](server.ref):
+  override val ref = echoRef</code></pre>
         </div>
       </section>
 
@@ -1265,69 +1275,142 @@ val server = new TcpServerProcess[F](transport, sink = echo.ref)</code></pre>
         <div>
           <div class="section-heading">
             <p class="eyebrow">Network</p>
-            <h2>TCP client process</h2>
+            <h2>TCP ping client</h2>
           </div>
           <p>
-            <code>TcpClientProcess</code> wraps a <code>RequestResponseClient</code>. Send it
-            <code>Cmd.netClient.Send(payload, replyTo)</code> and the reply (or <code>None</code>
-            on failure) is delivered back to <code>replyTo</code> as
-            <code>Cmd.netClient.Rep</code>.
+            <code>ClientProcess</code> wraps a <code>ClientTransport</code>. Send
+            <code>ClientProcess.Request</code> to it and it replies to the sender with either
+            <code>ClientProcess.Response</code> or <code>ClientProcess.Failed</code>.
           </p>
         </div>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
-          <pre><code>import io.parapet.net.processes.TcpClientProcess
+          <pre><code>import io.parapet.ProcessRef
+import io.parapet.core.Events.Start
+import io.parapet.core.Process
+import io.parapet.net.processes.ClientProcess
+import io.parapet.net.transport.Message
 
-class Caller[F[_]](client: ProcessRef[Cmd.netClient.Send]) extends Process[F, Cmd.netClient.Rep, Nothing]:
+class Caller[F[_]](
+    client: ProcessRef[ClientProcess.Request]
+) extends Process[F, ClientProcess.Response | ClientProcess.Failed, Nothing]:
   import dsl.*
 
   override def handle: Receive =
     case Start =&gt;
-      Cmd.netClient.Send("ping".getBytes, replyTo = Some(ref)) ~&gt; client
-    case Cmd.netClient.Rep(Some(bytes)) =&gt;
-      eval(println(s"got ${new String(bytes)}"))
-    case Cmd.netClient.Rep(None) =&gt;
-      eval(println("timed out"))</code></pre>
+      ClientProcess.Request(Message.single("ping".getBytes("UTF-8"))) ~&gt; client
+    case ClientProcess.Response(message) =&gt;
+      eval(println(s"got ${new String(message.parts.head, "UTF-8")}"))
+    case ClientProcess.Failed(error) =&gt;
+      eval(println(s"request failed: $error"))</code></pre>
         </div>
       </section>
 
       <section class="section" id="net-tcp-app">
         <div class="section-heading">
           <p class="eyebrow">Network</p>
-          <h2>Two processes over TCP</h2>
+          <h2>ZMQ wiring</h2>
         </div>
         <p>
-          A complete app: an echo server in one JVM, a caller in another. Same domain code, the
-          only difference is what each side registers.
+          ZMQ is the current TCP backend. Create the low-level transport at the edge, then register
+          ordinary Parapet processes around it.
         </p>
         <div class="code-card">
           <button class="copy-button" type="button">Copy</button>
           <pre><code>import cats.effect.IO
 import io.parapet.cats.CatsEffectParApp
-import io.parapet.core.Process
-import io.parapet.net.zmq.ZmqTcp
-import io.parapet.net.processes.{TcpClientProcess, TcpServerProcess}
+import io.parapet.ProcessRef
+import io.parapet.net.{Endpoint, TransportProtocol}
+import io.parapet.net.processes.{ClientProcess, ServerProcess}
+import io.parapet.net.transport.zmq.*
 
 object ServerApp extends CatsEffectParApp:
   def processes(args: Array[String]) =
-    for transport &lt;- ZmqTcp.server[IO](bind = "tcp://*:5555")
-    yield
-      val echo   = new Echo[IO]
-      val server = new TcpServerProcess[IO](transport, sink = echo.ref)
+    val echoRef = ProcessRef[ServerProcess.Received | ServerProcess.Failed]("echo")
+    val config = ZmqTcpServerConfig(
+      bind = Endpoint(TransportProtocol.Tcp, "*", 5555)
+    )
+
+    ZmqTcpServer.make[IO](config).allocated.map { case (transport, _) =&gt;
+      val server = new ServerProcess[IO](transport, sink = echoRef)
+      val echo = new Echo[IO](server.ref):
+        override val ref = echoRef
       Seq(echo, server)
+    }
 
 object ClientApp extends CatsEffectParApp:
   def processes(args: Array[String]) =
-    for transport &lt;- ZmqTcp.client[IO](connect = "tcp://server:5555")
-    yield
-      val client = new TcpClientProcess[IO](transport)
+    val config = ZmqTcpClientConfig(
+      remote = Endpoint(TransportProtocol.Tcp, "server", 5555)
+    )
+
+    ZmqTcpClient.make[IO](config).allocated.map { case (transport, _) =&gt;
+      val client = new ClientProcess[IO](transport)
       val caller = new Caller[IO](client.ref)
-      Seq(client, caller)</code></pre>
+      Seq(client, caller)
+    }</code></pre>
         </div>
         <p>
-          Other transports plug in the same way: swap <code>ZmqTcp</code> for <code>AeronUdp</code>
-          or your own. The process layer never changes.
+          In production code, keep the returned <code>Resource</code> alive for the application
+          lifetime so sockets are closed cleanly on shutdown.
         </p>
+      </section>
+
+      <section class="section two-column" id="net-udp">
+        <div>
+          <div class="section-heading">
+            <p class="eyebrow">Network</p>
+            <h2>UDP with Aeron</h2>
+          </div>
+          <p>
+            <code>AeronUdpTransport</code> implements <code>DatagramTransport</code>.
+            <code>DatagramProcess</code> publishes outbound datagrams and forwards received batches
+            to a sink as <code>DatagramProcess.Received</code>.
+          </p>
+        </div>
+        <div class="code-card">
+          <button class="copy-button" type="button">Copy</button>
+          <pre><code>import io.parapet.{Event, ProcessRef}
+import io.parapet.core.Events.Start
+import io.parapet.core.Process
+import io.parapet.net.processes.DatagramProcess
+import io.parapet.net.transport.Message
+import io.parapet.net.transport.aeron.*
+
+class Publisher[F[_]](
+    datagram: ProcessRef[DatagramProcess.Publish]
+) extends Process[F, Event, Nothing]:
+  import dsl.*
+
+  override def handle: Receive =
+    case Start =&gt;
+      DatagramProcess.Publish(
+        Message.single("hello".getBytes("UTF-8"))
+      ) ~&gt; datagram
+
+class UdpSink[F[_]]
+    extends Process[F, DatagramProcess.Received | DatagramProcess.Failed, Nothing]:
+  import dsl.*
+
+  override def handle: Receive =
+    case DatagramProcess.Received(message) =&gt;
+      eval(println(s"udp: ${new String(message.parts.head, "UTF-8")}"))
+    case DatagramProcess.Failed(error) =&gt;
+      eval(println(s"udp failed: $error"))
+
+val config = AeronUdpConfig(
+  channel = "aeron:udp?endpoint=localhost:40123",
+  streamId = 1001,
+  embeddedMediaDriver = true
+)
+
+for transport &lt;- AeronUdpTransport.make[F](config).allocated.map(_._1)
+yield
+  val sink      = new UdpSink[F]
+  val datagram  = new DatagramProcess[F](transport, sink.ref)
+  val publisher = new Publisher[F](datagram.ref)
+  Seq(datagram, sink, publisher)</code></pre>
+        </div>
       </section>
 
       <!-- ============================================================
@@ -1343,9 +1426,8 @@ object ClientApp extends CatsEffectParApp:
           <article><strong>parapet-testkit</strong><span>Shared conformance specs for runtime implementations.</span></article>
           <article><strong>parapet-cats-effect</strong><span>Recommended production backend for Cats Effect <code>IO</code>.</span></article>
           <article><strong>parapet-pario</strong><span>Small reference runtime for learning and tests.</span></article>
-          <article><strong>parapet-protocol</strong><span>Wire codecs and the cross-module command vocabulary (<code>Cmd</code>).</span></article>
+          <article><strong>parapet-protocol</strong><span>Wire codecs and generated protocol models.</span></article>
           <article><strong>parapet-net</strong><span>TCP / UDP transports and adapter processes.</span></article>
-          <article><strong>parapet-examples</strong><span>End-to-end demos including the graph-coloring simulation.</span></article>
         </div>
       </section>
 
